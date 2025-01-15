@@ -1,0 +1,18 @@
+{
+    "files": [
+        "widget.py",
+        "form.ui",
+        "image.qrc",
+        "biterPlugin/bit_api.py",
+        "biterPlugin/bit_playwright.py",
+        "biterPlugin/bit_selenium.py",
+        "TabCode/SystemSettingTab.py",
+        "login/login.py",
+        "login/LoginForm.ui",
+        "__init__.py",
+        "TabCode/AccountListTab.py",
+        "TaskConfiguration/TaskConfiguration.py",
+        "TaskConfiguration/TaskConfiguration.ui",
+        "TabCode/TaskExecutionTab.py"
+    ]
+}
