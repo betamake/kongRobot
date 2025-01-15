@@ -1,16 +1,34 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-                              QTextEdit, QLabel, QGroupBox)
+                              QTextEdit, QLabel, QGroupBox, QMessageBox)
 from PySide6.QtCore import Qt, Slot
-
+import importlib.util
+import os
+import sys
+import asyncio
+from playwright.async_api import async_playwright
 class TaskExecutionTab(QWidget):
     def __init__(self, tasks=None, parent=None):
         super().__init__(parent)
-        # 确保 tasks 是列表类型
         self.tasks = tasks if isinstance(tasks, list) else []
-        print(f"TaskExecutionTab 接收到的任务: {self.tasks}")  # 调试输出
+        self.running = False  # 任务运行状态
+
+        # 修改Task目录路径获取方式
+        current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.task_dir = os.path.join(current_dir, "TaskConfiguration", "Task")
+        print(f"Task目录路径: {self.task_dir}")  # 调试输出
+
+        if not os.path.exists(self.task_dir):
+            print(f"警告: Task目录不存在: {self.task_dir}")
+        else:
+            print(f"Task目录存在，内容: {os.listdir(self.task_dir)}")
+
+        if self.task_dir not in sys.path:
+            sys.path.append(self.task_dir)
+
         self.setup_ui()
         self.setup_connections()
         self.update_task_info()
+
 
 
     def setup_ui(self):
@@ -134,30 +152,140 @@ class TaskExecutionTab(QWidget):
 
     def add_log(self, message):
         """添加日志"""
-        self.log_display.append(message)
-
+        if hasattr(self, 'log_display'):
+            self.log_display.append(message)
+        print(message)  # 同时打印到控制台
     @Slot()
     def start_tasks(self):
         """开始执行任务"""
-        self.start_button.setEnabled(False)
-        self.pause_button.setEnabled(True)
-        self.stop_button.setEnabled(True)
-        self.add_log("开始执行任务...")
-        # TODO: 实现实际的任务执行逻辑
+        try:
+            if not self.tasks:
+                self.add_log("错误: 没有可执行的任务")
+                return
 
-    @Slot()
-    def pause_tasks(self):
-        """暂停任务"""
+            self.start_button.setEnabled(False)
+            self.pause_button.setEnabled(True)
+            self.stop_button.setEnabled(True)
+            self.running = True
+
+            # 创建事件循环
+            self.loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.loop)
+
+            # 启动任务执行
+            self.loop.run_until_complete(self.execute_tasks())
+
+        except Exception as e:
+            self.add_log(f"启动任务时出错: {str(e)}")
+            self.reset_buttons()
+
+    async def execute_tasks(self):
+        """异步执行任务"""
+        try:
+            self.add_log("开始执行任务...")
+            print(f"当前目录: {os.getcwd()}")
+            print(f"Task目录: {self.task_dir}")
+
+            # 使用 async with 确保正确关闭 playwright
+            async with async_playwright() as playwright:
+                for task_name in self.tasks:
+                    if not self.running:
+                        self.add_log("任务执行被停止")
+                        break
+
+                    try:
+                        self.add_log(f"开始执行任务: {task_name}")
+                        task_path = os.path.join(self.task_dir, task_name)
+                        print(f"检查任务路径: {task_path}")
+
+                        if os.path.exists(task_path):
+                            # 检查main.py是否存在
+                            main_file = os.path.join(task_path, 'main.py')
+                            print(f"检查main文件: {main_file}")
+
+                            if os.path.exists(main_file):
+                                print(f"找到main文件: {main_file}")
+                                # 直接导入并执行main.py
+                                spec = importlib.util.spec_from_file_location("main", main_file)
+                                module = importlib.util.module_from_spec(spec)
+                                spec.loader.exec_module(module)
+                                await module.run(playwright)
+                                self.add_log(f"任务 {task_name} 执行完成")
+                            else:
+                                self.add_log(f"错误: 找不到main.py文件: {main_file}")
+                        else:
+                            self.add_log(f"任务目录不存在: {task_path}")
+                            print(f"尝试的完整路径: {task_path}")
+
+                    except Exception as e:
+                        self.add_log(f"执行任务 {task_name} 时出错: {str(e)}")
+                        import traceback
+                        print(f"错误堆栈: {traceback.format_exc()}")
+                        continue
+
+            self.add_log("所有任务执行完成")
+
+        except Exception as e:
+            self.add_log(f"执行任务时出错: {str(e)}")
+            import traceback
+            print(f"错误堆栈: {traceback.format_exc()}")
+
+        finally:
+            self.reset_buttons()
+    def reset_buttons(self):
+        """重置按钮状态"""
         self.start_button.setEnabled(True)
         self.pause_button.setEnabled(False)
-        self.add_log("任务已暂停")
-        # TODO: 实现实际的暂停逻辑
+        self.stop_button.setEnabled(False)
+        self.running = False
 
     @Slot()
     def stop_tasks(self):
         """停止任务"""
-        self.start_button.setEnabled(True)
-        self.pause_button.setEnabled(False)
-        self.stop_button.setEnabled(False)
-        self.add_log("任务已停止")
-        # TODO: 实现实际的停止逻辑
+        try:
+            self.running = False
+            self.add_log("正在停止任务...")
+            self.reset_buttons()
+        except Exception as e:
+            self.add_log(f"停止任务时出错: {str(e)}")
+
+    @Slot()
+    def pause_tasks(self):
+        """暂停任务"""
+        # TODO: 实现暂停功能
+        self.add_log("暂停功能暂未实现")
+        pass
+
+    def add_log(self, message):
+        """添加日志"""
+        if hasattr(self, 'log_display'):
+            self.log_display.append(message)
+        print(message)  # 同时打印到控制台
+    def load_task_modules(self):
+        """加载任务模块"""
+        try:
+            # 获取Task文件夹的路径
+            current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            task_folder = os.path.join(current_dir, "Task")
+
+            for task_name in self.tasks:
+                # 构建任务文件夹的完整路径
+                task_dir = os.path.join(task_folder, task_name)
+
+                if not os.path.exists(task_dir):
+                    self.add_log(f"错误: 找不到任务文件夹 {task_dir}")
+                    continue
+
+                # 查找文件夹中的主文件（通常是 __init__.py 或 main.py）
+                main_file = None
+                for file_name in ['__init__.py', 'main.py']:
+                    file_path = os.path.join(task_dir, file_name)
+                    if os.path.exists(file_path):
+                        main_file = file_path
+                        break
+
+                if not main_file:
+                    self.add_log(f"错误: 在 {task_name} 中找不到主文件")
+                    continue
+        except Exception as e:
+            self.add_log(f"加载任务模块时出错: {str(e)}")

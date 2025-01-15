@@ -65,26 +65,27 @@ class MainTaskConfiguration(QWidget):
                     QMessageBox.warning(self, "错误", f"Task文件夹不存在！\n已检查路径:\n{task_folder}\n{alternative_path}")
                     return
 
-            # 遍历Task文件夹中的所有.py文件
-            task_files = []
-            for filename in os.listdir(task_folder):
-                if filename.endswith('.py') and not filename.startswith('__'):
-                    task_name = filename[:-3]  # 移除 .py 扩展名
-                    task_files.append(task_name)
+            # 遍历Task文件夹中的所有子文件夹
+            task_folders = []
+            for item in os.listdir(task_folder):
+                item_path = os.path.join(task_folder, item)
+                # 检查是否是文件夹且不以__开头
+                if os.path.isdir(item_path) and not item.startswith('__'):
+                    task_folders.append(item)
 
-            # 如果没有找到任务文件
-            if not task_files:
-                checkbox = QCheckBox("没有找到任务文件")
+            # 如果没有找到任务文件夹
+            if not task_folders:
+                checkbox = QCheckBox("没有找到任务")
                 checkbox.setEnabled(False)
                 self.task_layout.addWidget(checkbox)
                 return
 
             # 添加找到的任务
-            for task_name in sorted(task_files):  # 排序任务名称
+            for task_name in sorted(task_folders):  # 排序任务名称
                 checkbox = QCheckBox(task_name)
                 self.task_layout.addWidget(checkbox)
 
-            print(f"找到 {len(task_files)} 个任务文件")
+            print(f"找到 {len(task_folders)} 个任务文件夹")
 
         except Exception as e:
             print(f"加载任务时出错：{str(e)}")
