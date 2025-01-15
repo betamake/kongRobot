@@ -13,6 +13,8 @@
         "TabCode/AccountListTab.py",
         "TaskConfiguration/TaskConfiguration.py",
         "TaskConfiguration/TaskConfiguration.ui",
-        "TabCode/TaskExecutionTab.py"
+        "TabCode/TaskExecutionTab.py",
+        "UniversalPlugin/readExcle.py",
+        "UniversalPlugin/receiveMailCode.py"
     ]
 }
